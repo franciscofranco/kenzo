@@ -46,10 +46,6 @@
 #include <linux/fastcharge.h>
 #endif
 
-#ifdef CONFIG_MACH_XIAOMI_KENZO
-int FG_charger_status = 0;
-#endif
-
 /* Mask/Bit helpers */
 #define _SMB_MASK(BITS, POS) \
 	((unsigned char)(((1 << (BITS)) - 1) << (POS)))
@@ -264,6 +260,7 @@ struct smbchg_chip {
 	struct delayed_work		vfloat_adjust_work;
 	struct delayed_work		hvdcp_det_work;
 	struct delayed_work		reg_work;
+	struct delayed_work		redetect_work;
 	spinlock_t			sec_access_lock;
 	struct mutex			therm_lvl_lock;
 	struct mutex			usb_set_online_lock;
@@ -431,7 +428,7 @@ module_param_named(
 	int, S_IRUSR | S_IWUSR
 );
 
-static int smbchg_default_dcp_icl_ma = 2000;
+static int smbchg_default_dcp_icl_ma = 2400;
 module_param_named(
 	default_dcp_icl_ma, smbchg_default_dcp_icl_ma,
 	int, S_IRUSR | S_IWUSR
@@ -1829,7 +1826,7 @@ static int smbchg_set_fastchg_current_raw(struct smbchg_chip *chip,
 #define USBIN_ACTIVE_PWR_SRC_BIT	BIT(1)
 #define DCIN_ACTIVE_PWR_SRC_BIT		BIT(0)
 #define PARALLEL_REENABLE_TIMER_MS	1000
-#define PARALLEL_CHG_THRESHOLD_CURRENT	1800
+#define PARALLEL_CHG_THRESHOLD_CURRENT	2400
 static bool smbchg_is_usbin_active_pwr_src(struct smbchg_chip *chip)
 {
 	int rc;
@@ -4198,14 +4195,9 @@ reschedule:
 static int smbchg_charging_status_change(struct smbchg_chip *chip)
 {
 	smbchg_vfloat_adjust_check(chip);
-#ifdef CONFIG_MACH_XIAOMI_KENZO
-	FG_charger_status = get_prop_batt_status(chip);
-	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
-			FG_charger_status);
-#else
 	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
 			get_prop_batt_status(chip));
-#endif
+
 	return 0;
 }
 
@@ -4677,14 +4669,8 @@ void update_usb_status(struct smbchg_chip *chip, bool usb_present, bool force)
 	}
 
 	/* update FG */
-#ifdef CONFIG_MACH_XIAOMI_KENZO
-	FG_charger_status = get_prop_batt_status(chip);
-	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
-			FG_charger_status);
-#else
 	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
 			get_prop_batt_status(chip));
-#endif
 unlock:
 	mutex_unlock(&chip->usb_status_lock);
 }
@@ -6656,14 +6642,8 @@ static irqreturn_t usbid_change_handler(int irq, void *_chip)
 		pr_smb(PR_STATUS, "OTG detected\n");
 
 	/* update FG */
-#ifdef CONFIG_MACH_XIAOMI_KENZO
-	FG_charger_status = get_prop_batt_status(chip);
 	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
-			FG_charger_status);
-#else
-	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
-			get_prop_batt_status(chip));
-#endif
+		get_prop_batt_status(chip));
 
 	return IRQ_HANDLED;
 }
