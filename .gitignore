@@ -98,3 +98,4 @@ build.sh
 upload.sh
 version
 out/
+repack_ramdisk.sh
